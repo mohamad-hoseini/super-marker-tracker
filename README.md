@@ -17,4 +17,4 @@ Super Marker Tracker is a Python-based implementation for supervised marker trac
    ```bash
    git clone https://github.com/mohamad-hoseini/super-marker-tracker.git
    cd super-marker-tracker
-2. the folder pose_estimation includes the dataset that original Facemap paper trained on.
+2. the folder [pose_estimation]([url](https://github.com/mohamad-hoseini/super-marker-tracker/tree/main/pose_estimation)) includes the dataset that original Facemap paper trained on.
