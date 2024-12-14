@@ -8,8 +8,6 @@ Super Marker Tracker is a Python-based implementation for supervised marker trac
 
 - **Marker Detection:** Identify specific markers in video frames.
 - **Supervised Tracking:** Leverage annotations to improve tracking precision.
-- **Facemap Integration:** Utilize core concepts from the Facemap framework.
-- **Customizable Pipeline:** Flexible setup for various video datasets.
 
 ---
 
