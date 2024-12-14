@@ -1,51 +1,48 @@
-"""
-Copright © 2023 Howard Hughes Medical Institute, Authored by Carsen Stringer and Atika Syeda.
-"""
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Network ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-class FMnet(nn.Module):
+class FaceMapNet(nn.Module):
     def __init__(
         self,
-        img_ch,
-        output_ch,
+        image_channels,
+        output_channels,
         labels_id,
-        channels,
+        hidden_channels,
         device,
         kernel=3,
         shape=(256, 256),
-        n_upsample=2,
+        num_upsamples=2,
     ):
         super().__init__()
-        self.n_upsample = n_upsample
+        self.n_upsamples = num_upsamples
         self.image_shape = shape
-        self.bodyparts = labels_id
+        self.bodylabels = labels_id
         self.device = device
 
         self.Conv = nn.Sequential()
         self.Conv.add_module(
             "conv0",
-            convblock(ch_in=img_ch, ch_out=channels[0], kernel_sz=kernel, block=0),
+            conv_block(ch_in=image_channels, ch_out=hidden_channels[0], kernel_sz=kernel, block=0),
         )
-        for k in range(1, len(channels)):
+        for k in range(1, len(hidden_channels)):
             self.Conv.add_module(
                 f"conv{k}",
-                convblock(
-                    ch_in=channels[k - 1], ch_out=channels[k], kernel_sz=kernel, block=k
+                conv_block(
+                    ch_in=hidden_channels[k - 1], ch_out=hidden_channels[k], kernel_sz=kernel, block=k
                 ),
             )
 
         self.Up_conv = nn.Sequential()
-        for k in range(n_upsample):
+        for k in range(num_upsamples):
             self.Up_conv.add_module(
                 f"upconv{k}",
-                convblock(
-                    ch_in=channels[-1 - k] + channels[-2 - k],
-                    ch_out=channels[-2 - k],
+                conv_block(
+                    ch_in=hidden_channels[-1 - k] + hidden_channels[-2 - k],
+                    ch_out=hidden_channels[-2 - k],
                     kernel_sz=kernel,
                 ),
             )
@@ -54,7 +51,7 @@ class FMnet(nn.Module):
         for j in range(3):
             self.Conv2_1x1.add_module(
                 f"conv{j}",
-                nn.Conv2d(channels[-2 - k], output_ch, kernel_size=1, padding=0),
+                nn.Conv2d(hidden_channels[-2 - k], output_channels, kernel_size=1, padding=0),
             )
 
     def forward(self, x, normalize=False, smooth_confidence=False, verbose=False):
@@ -95,17 +92,6 @@ def gaussian_wavelet(bin_size, sigma):
 # Write a function that takes a heatmap of dimensions (n_batches, n_keypoints, width, height)
 # and returns a smoothed heatmap using the gaussian smoothing function
 def smooth_heatmap(heatmap, device=None):
-    """
-    Parameters
-    ----------------
-    heatmap: ND-array of shape (n_batches, n_keypoints, width, height)
-                A heatmap containing confidence scores for each key point
-    Returns
-    ----------------
-    heatmap_smoothed_reshaped: ND-array of shape (n_batches, n_keypoints, width, height)
-                            A smoothed heatmap containing confidence scores resulting from covolution
-                             across a batch of images for each key point
-    """
     n_batches = heatmap.shape[0]
     n_keypoints = heatmap.shape[1]
     lx = heatmap.shape[2]
@@ -135,30 +121,30 @@ def smooth_heatmap(heatmap, device=None):
     return heatmap_smoothed_reshaped
 
 
-class convblock(nn.Module):
+class conv_block(nn.Module):
     def __init__(self, ch_in, ch_out, kernel_sz, block=-1):
         super().__init__()
         self.conv = nn.Sequential()
         self.block = block
         if self.block != 0:
-            self.conv.add_module("conv_0", batchconv(ch_in, ch_out, kernel_sz))
+            self.conv.add_module("conv_0", batch_conv(ch_in, ch_out, kernel_sz))
         else:
-            self.conv.add_module("conv_0", batchconv0(ch_in, ch_out, kernel_sz))
-        self.conv.add_module("conv_1", batchconv(ch_out, ch_out, kernel_sz))
+            self.conv.add_module("conv_0", first_conv(ch_in, ch_out, kernel_sz))
+        self.conv.add_module("conv_1", batch_conv(ch_out, ch_out, kernel_sz))
 
     def forward(self, x):
         x = self.conv[1](self.conv[0](x))
         return x
 
 
-def batchconv0(ch_in, ch_out, kernel_sz):
+def first_conv(ch_in, ch_out, kernel_sz):
     return nn.Sequential(
         nn.BatchNorm2d(ch_in, eps=1e-5, momentum=0.1),
         nn.Conv2d(ch_in, ch_out, kernel_sz, padding=kernel_sz // 2, bias=False),
     )
 
 
-def batchconv(ch_in, ch_out, sz):
+def batch_conv(ch_in, ch_out, sz):
     return nn.Sequential(
         nn.BatchNorm2d(ch_in, eps=1e-5, momentum=0.1),
         nn.ReLU(inplace=True),
